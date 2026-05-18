@@ -2,7 +2,15 @@ phase: 6
 name: "atlas_utility_test"
 
 model:
-  alias: "llama-1b-instruct"
+  alias: "qwen-0.5b-instruct"
+  load_in_8bit: false
+  load_in_4bit: false
+
+device: "cpu"
+dtype: "float32"
+max_new_tokens: 30
+num_generations: 1
+seed: 42
 
 routing:
   policy: "threshold"              # "threshold" | "learned" | "rl"
@@ -27,13 +35,10 @@ baselines:
   self_consistency: true
 
 evaluation:
+  domain: "medical_advice"
+  n_examples: 20
   metrics:
     - accuracy
-    - abstention_f1
     - coverage
-    - calibration_error
     - nli_entailment
     - nli_contradiction
-  dataset: "trivia_qa"
-  split: "validation"
-  n_examples: 500
