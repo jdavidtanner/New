@@ -1,0 +1,44 @@
+phase: 5
+name: "synthetic_ontology_test"
+
+ontology:
+  num_entities: 50
+  num_relations: 8
+  num_rules: 20
+  num_bridge_concepts: 10         # concepts that will be removed/added
+  num_contradictions: 5
+  graph_density: 0.15
+  seed: 42
+
+corpus:
+  sentences_per_triple: 3
+  train_size: 5000
+  val_size: 500
+  test_size: 500
+
+toy_model:
+  architecture: "gpt2"             # "gpt2" | "nanogpt"
+  hidden_size: 128
+  num_layers: 4
+  num_heads: 4
+  max_position_embeddings: 256
+  vocab_size: 2000
+
+training:
+  num_epochs: 20
+  batch_size: 32
+  learning_rate: 3.0e-4
+  warmup_steps: 100
+  checkpoint_every: 5              # epochs
+
+probing:
+  n_prompts_per_bridge: 20
+  curvature_proxies:
+    - trajectory_divergence
+    - intrinsic_dimension
+  semantic_metrics:
+    - nli_entailment
+    - self_consistency
+
+causal_test:
+  n_add_remove_cycles: 3           # add bridge concept, measure, remove, measure

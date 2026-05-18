@@ -1,0 +1,20 @@
+phase: 2
+name: "cross_architecture_replication"
+
+model_sweep:
+  - "llama-1b-base"
+  - "llama-1b-instruct"
+  - "llama-3b-base"
+  - "llama-3b-instruct"
+  - "mistral-7b-base"
+  - "mistral-7b-instruct"
+  - "qwen-0.5b-base"
+  - "qwen-1.5b-instruct"
+
+phase1_config: "configs/phase1_observational.yaml"
+
+comparison:
+  effect_size_metric: "cohens_d"  # "cohens_d" | "eta_squared"
+  significance_level: 0.05
+  fdr_correction: true
+  min_replications_for_support: 4

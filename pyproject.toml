@@ -1,0 +1,102 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "curvature-semantics"
+version = "0.1.0"
+description = "Empirical testing of the hypothesis: positive curvature obstructs semantic completeness in LLM decision-making"
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+
+dependencies = [
+    "torch>=2.1.0",
+    "transformers>=4.40.0",
+    "datasets>=2.18.0",
+    "pydantic>=2.6.0",
+    "pyyaml>=6.0",
+    "numpy>=1.26.0",
+    "pandas>=2.2.0",
+    "tqdm>=4.66.0",
+    "rich>=13.7.0",
+]
+
+[project.optional-dependencies]
+semantics = [
+    "sentence-transformers>=2.7.0",
+    "evaluate>=0.4.1",
+    "bert-score>=0.3.13",
+    "rouge-score>=0.1.2",
+]
+curvature = [
+    "scikit-learn>=1.4.0",
+    "networkx>=3.3",
+    "POT>=0.9.3",
+]
+tda = [
+    "ripser>=0.6.8",
+    "gudhi>=3.9.0",
+    "persim>=0.3.1",
+]
+regression = [
+    "statsmodels>=0.14.1",
+    "dowhy>=0.11.1",
+    "econml>=0.15.1",
+    "scipy>=1.12.0",
+]
+viz = [
+    "matplotlib>=3.8.0",
+    "seaborn>=0.13.0",
+    "umap-learn>=0.5.6",
+    "plotly>=5.20.0",
+]
+finetune = [
+    "peft>=0.10.0",
+    "trl>=0.8.0",
+    "accelerate>=0.29.0",
+    "bitsandbytes>=0.43.0",
+]
+dev = [
+    "pytest>=8.1.0",
+    "pytest-cov>=5.0.0",
+    "black>=24.3.0",
+    "ruff>=0.4.0",
+    "mypy>=1.9.0",
+]
+all = [
+    "curvature-semantics[semantics,curvature,tda,regression,viz,finetune]",
+]
+
+[project.scripts]
+curvature-phase1 = "curvature_semantics.phases.phase1.cli:main"
+curvature-phase2 = "curvature_semantics.phases.phase2.cli:main"
+curvature-phase3 = "curvature_semantics.phases.phase3.cli:main"
+curvature-phase4 = "curvature_semantics.phases.phase4.cli:main"
+curvature-phase5 = "curvature_semantics.phases.phase5.cli:main"
+curvature-phase6 = "curvature_semantics.phases.phase6.cli:main"
+curvature-regress = "curvature_semantics.regression.regression_report:main"
+curvature-viz = "curvature_semantics.visualization.curvature_atlas:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["curvature_semantics*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

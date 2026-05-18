@@ -1,0 +1,30 @@
+phase: 3
+name: "layerwise_decision_geometry"
+
+model:
+  alias: "llama-1b-instruct"
+
+layer_schedule:
+  mode: "all"             # "all" | "strided" | "explicit"
+  stride: 2               # used if mode == "strided"
+  indices: []             # used if mode == "explicit"
+
+layer_regions:
+  embedding: [0]
+  early_fraction: 0.25    # layers in [0, 0.25 * n_layers)
+  middle_fraction: 0.50   # layers in [0.25, 0.75 * n_layers)
+  late_fraction: 0.25     # layers in [0.75, 1.0 * n_layers)
+  # residual stream is extracted separately via the final norm output
+  extract_logits: true
+
+curvature_proxies:
+  - trajectory_divergence
+  - intrinsic_dimension
+  - neighborhood_distortion
+
+semantic_metrics:
+  - nli_entailment
+  - self_consistency
+
+hypothesis:
+  obstruction_region: "middle"   # expected layer region where curvature peaks

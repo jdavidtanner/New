@@ -1,0 +1,39 @@
+phase: 4
+name: "intervention_testing"
+
+model:
+  alias: "llama-1b-instruct"
+
+interventions:
+  evidence_insertion:
+    enabled: true
+    num_sentences: 3
+    source: "gold_context"
+  bridge_concept:
+    enabled: true
+    max_concepts: 5
+    source: "ontology"
+  contradiction_removal:
+    enabled: true
+    nli_threshold: 0.7
+  finetuning:
+    enabled: false           # expensive; set true for full run
+    method: "lora"
+    lora_r: 8
+    lora_alpha: 16
+    lora_dropout: 0.05
+    learning_rate: 2.0e-4
+    num_epochs: 3
+    batch_size: 4
+    dataset: "missing_links"
+  curvature_aware_retrieval:
+    enabled: true
+    top_k: 5
+    curvature_weight: 0.4    # blend: sim_score * (1 - w) + curv_reduction * w
+    retrieval_model: "sentence-transformers/all-MiniLM-L6-v2"
+
+domains:
+  - "speculative_medicine"
+  - "synthetic_biography"
+
+prompts_per_domain: 50

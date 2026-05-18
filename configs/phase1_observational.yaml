@@ -1,0 +1,88 @@
+phase: 1
+name: "observational_mapping"
+
+model:
+  alias: "llama-1b-instruct"
+  load_in_8bit: false
+  load_in_4bit: false
+
+domains:
+  low_curvature:
+    - "arithmetic"
+    - "geography"
+    - "basic_physics"
+    - "biological_taxonomy"
+    - "historical_dates"
+  medium_curvature:
+    - "legal_reasoning"
+    - "medical_advice"
+    - "historical_interpretation"
+  high_curvature:
+    - "speculative_medicine"
+    - "synthetic_biography"
+    - "fictional_canon_blending"
+
+prompts_per_domain: 100
+perturbations_per_prompt: 5
+
+layers:
+  extract_all: true
+  # If extract_all is false, specify indices:
+  # indices: [0, 4, 8, 12, 16, 20, -1]
+
+perturbations:
+  text:
+    - synonym_substitution
+    - sentence_reorder
+    - active_passive
+    - distractor_insertion
+    - evidence_reorder
+  embedding:
+    - gaussian_noise
+    - pca_direction
+    - manifold_direction
+
+curvature_proxies:
+  - trajectory_divergence
+  - intrinsic_dimension
+  - neighborhood_distortion
+  - geodesic_deviation
+  - ricci_graph_curvature
+  - persistent_homology
+
+curvature_params:
+  trajectory_divergence:
+    n_neighbors: 10
+  intrinsic_dimension:
+    method: "twonn"        # "twonn" | "mle"
+  neighborhood_distortion:
+    k: 15
+  geodesic_deviation:
+    n_samples: 50
+  ricci_graph_curvature:
+    k: 10
+    alpha: 0.5
+  persistent_homology:
+    max_dim: 2
+    metric: "euclidean"
+
+semantic_metrics:
+  - nli_entailment
+  - nli_contradiction
+  - factuality
+  - self_consistency
+  - calibration_error
+  - ood_uncertainty
+
+nli_model: "cross-encoder/nli-deberta-v3-base"
+factuality_model: "cross-encoder/nli-deberta-v3-base"
+
+regression:
+  target: "nli_entailment"
+  predictors:
+    - "trajectory_divergence"
+    - "intrinsic_dimension"
+    - "neighborhood_distortion"
+    - "entropy"
+    - "confidence"
+    - "model_size"
