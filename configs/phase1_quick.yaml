@@ -1,0 +1,69 @@
+phase: 1
+name: "observational_mapping"
+
+model:
+  alias: "qwen-0.5b-base"
+  load_in_8bit: false
+  load_in_4bit: false
+
+device: "cpu"
+dtype: "float32"
+max_new_tokens: 30
+temperature: 0.0
+num_generations: 3
+seed: 42
+
+domains:
+  low_curvature:
+    - "arithmetic"
+    - "basic_physics"
+  medium_curvature:
+    - "medical_advice"
+  high_curvature:
+    - "speculative_medicine"
+    - "synthetic_biography"
+
+prompts_per_domain: 20
+perturbations_per_prompt: 3
+
+layers:
+  extract_all: false
+  indices: [0, 6, 12, 18, 23]    # embedding, early, mid-early, mid-late, final
+
+perturbations:
+  text:
+    - synonym_substitution
+    - sentence_reorder
+    - distractor_insertion
+  embedding: []
+
+curvature_proxies:
+  - trajectory_divergence
+  - intrinsic_dimension
+  - neighborhood_distortion
+
+curvature_params:
+  trajectory_divergence:
+    n_neighbors: 8
+  intrinsic_dimension:
+    method: "twonn"
+  neighborhood_distortion:
+    k: 8
+
+semantic_metrics:
+  - nli_entailment
+  - nli_contradiction
+  - self_consistency
+  - ood_uncertainty
+
+nli_model: "cross-encoder/nli-deberta-v3-base"
+
+regression:
+  target: "nli_entailment"
+  predictors:
+    - "trajectory_divergence"
+    - "intrinsic_dimension"
+    - "neighborhood_distortion"
+    - "entropy"
+    - "confidence"
+    - "model_params_billions"
