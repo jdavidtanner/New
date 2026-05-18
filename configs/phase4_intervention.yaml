@@ -2,7 +2,9 @@ phase: 4
 name: "intervention_testing"
 
 model:
-  alias: "llama-1b-instruct"
+  alias: "qwen-0.5b-instruct"
+  load_in_8bit: false
+  load_in_4bit: false
 
 interventions:
   evidence_insertion:
@@ -32,8 +34,13 @@ interventions:
     curvature_weight: 0.4    # blend: sim_score * (1 - w) + curv_reduction * w
     retrieval_model: "sentence-transformers/all-MiniLM-L6-v2"
 
-domains:
-  - "speculative_medicine"
-  - "synthetic_biography"
+device: "cpu"
+dtype: "float32"
+max_new_tokens: 30
+seed: 42
 
-prompts_per_domain: 50
+domains:
+  - "medical_advice"
+  - "arithmetic"
+
+prompts_per_domain: 12
