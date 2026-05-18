@@ -11,6 +11,11 @@ The package is organized into six phases:
 5. **Synthetic ontology testing**: build controlled ontologies, remove/restore bridge concepts, train or simulate toy probes, and measure causal signatures.
 6. **Atlas utility testing**: use curvature-aware routing and compare it against baseline answer/RAG/calibration/self-consistency systems.
 
+
+## Project goal
+
+The north-star goal is to determine whether curvature-derived features from LLM hidden-state geometry are predictive of semantic failure. In this repo, "moving forward" means getting closer to a held-out predictive test: do curvature features predict incomplete, contradictory, uncertain, or incorrect answers, and do they add signal beyond entropy, confidence, domain, layer, and model-size baselines? See `docs/ROADMAP.md` for the milestone plan.
+
 ## Installation
 
 ```bash

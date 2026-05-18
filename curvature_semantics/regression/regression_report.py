@@ -9,23 +9,37 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from curvature_semantics.core.artifact_store import ArtifactStore
 from curvature_semantics.core.logging_utils import get_logger
 from curvature_semantics.regression.feature_builder import build_regression_matrix
-from curvature_semantics.regression.ols_regression import OLSRegression
 from curvature_semantics.regression.mixed_effects import MixedEffectsRegression
-from curvature_semantics.utils.statistical_utils import partial_correlation, fdr_correct
+from curvature_semantics.regression.ols_regression import OLSRegression
+from curvature_semantics.utils.statistical_utils import (
+    fdr_correct,
+    partial_correlation,
+    pearsonr,
+)
 
 logger = get_logger(__name__)
 
 
-def generate_report(df: pd.DataFrame, output_dir: Path, cfg: dict[str, Any] | None = None) -> dict[str, Any]:
+def generate_report(
+    df: pd.DataFrame,
+    output_dir: Path,
+    cfg: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     cfg = cfg or {}
     target = cfg.get("target", "nli_entailment")
-    predictors = cfg.get("predictors", [
-        "trajectory_divergence", "intrinsic_dimension", "neighborhood_distortion",
-        "entropy", "confidence", "model_params_billions",
-    ])
+    predictors = cfg.get(
+        "predictors",
+        [
+            "trajectory_divergence",
+            "intrinsic_dimension",
+            "neighborhood_distortion",
+            "entropy",
+            "confidence",
+            "model_params_billions",
+        ],
+    )
 
     report: dict[str, Any] = {}
 
@@ -38,19 +52,22 @@ def generate_report(df: pd.DataFrame, output_dir: Path, cfg: dict[str, Any] | No
     report["mixed_effects"] = lmm.summary()
 
     # Partial correlations
-    X, y = build_regression_matrix(df, target=target, predictors=predictors)
-    controls = X.values
+    features_df, y = build_regression_matrix(df, target=target, predictors=predictors)
+    controls = features_df.values
     partial_corrs = {}
     p_values = []
-    predictor_names = list(X.columns)
+    predictor_names = list(features_df.columns)
     for col in predictor_names:
-        col_idx = list(X.columns).index(col)
+        col_idx = list(features_df.columns).index(col)
         other_idx = [i for i in range(len(predictor_names)) if i != col_idx]
         if other_idx:
-            r, p = partial_correlation(X.iloc[:, col_idx].values, y.values, controls[:, other_idx])
+            r, p = partial_correlation(
+                features_df.iloc[:, col_idx].values,
+                y.values,
+                controls[:, other_idx],
+            )
         else:
-            from scipy import stats
-            r, p = stats.pearsonr(X.iloc[:, col_idx].values, y.values)
+            r, p = pearsonr(features_df.iloc[:, col_idx].values, y.values)
         partial_corrs[col] = {"r": float(r), "p": float(p)}
         p_values.append(float(p))
 
@@ -70,14 +87,13 @@ def generate_report(df: pd.DataFrame, output_dir: Path, cfg: dict[str, Any] | No
 
 def _make_latex_table(partial_corrs: dict, ols_summary: dict) -> str:
     coefs = ols_summary.get("coefficients", {})
-    pvals = ols_summary.get("p_values", {})
     lines = [
         r"\begin{table}[ht]",
         r"\centering",
         r"\caption{Regression: Semantic Completeness $\sim$ Curvature Proxies}",
         r"\begin{tabular}{lrrr}",
         r"\hline",
-        r"Predictor & $\beta$ (OLS) & $r_{\text{partial}}$ & $p_{\text{FDR}}$ \\",
+        r"Predictor & $\beta$ (OLS) & $r_{\text{partial}}$ & $p_{\text{FDR}}$ " + r"\\",
         r"\hline",
     ]
     for pred, pc in partial_corrs.items():
@@ -85,9 +101,18 @@ def _make_latex_table(partial_corrs: dict, ols_summary: dict) -> str:
         r = pc["r"]
         p_fdr = pc.get("p_fdr", float("nan"))
         sig = "**" if p_fdr < 0.01 else ("*" if p_fdr < 0.05 else "")
-        lines.append(f"  {pred.replace('_', r'\_')} & {beta:.3f} & {r:.3f} & {p_fdr:.3f}{sig} \\\\")
+        escaped_pred = pred.replace("_", r"\_")
+        lines.append(
+            f"  {escaped_pred} & {beta:.3f} & {r:.3f} & {p_fdr:.3f}{sig} " + r"\\"
+        )
     r2 = ols_summary.get("r_squared", float("nan"))
-    lines += [r"\hline", f"$R^2$ & {r2:.3f} & & \\\\", r"\hline", r"\end{tabular}", r"\end{table}"]
+    lines += [
+        r"\hline",
+        f"$R^2$ & {r2:.3f} & & " + r"\\",
+        r"\hline",
+        r"\end{tabular}",
+        r"\end{table}",
+    ]
     return "\n".join(lines)
 
 
