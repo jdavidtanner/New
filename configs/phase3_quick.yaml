@@ -1,0 +1,49 @@
+phase: 3
+name: "causal_activation_patching"
+
+model:
+  alias: "qwen-0.5b-base"
+  load_in_8bit: false
+  load_in_4bit: false
+
+device: "cpu"
+dtype: "float32"
+max_new_tokens: 30
+temperature: 0.0
+seed: 42
+
+domains:
+  low_curvature:
+    - "arithmetic"
+    - "basic_physics"
+  high_curvature:
+    - "medical_advice"
+
+prompts_per_domain: 8
+
+# Layers to target: early (layer 3), middle (layer 12), late (layer 21) for Qwen-0.5B (24 layers)
+target_layers: [3, 12, 21]
+
+# Noise levels as fraction of activation norm
+# 0.0 = clean baseline; higher = more geometric distortion
+noise_alphas: [0.0, 0.05, 0.1, 0.3, 1.0]
+
+curvature_proxies:
+  - trajectory_divergence
+  - intrinsic_dimension
+  - neighborhood_distortion
+
+curvature_params:
+  trajectory_divergence:
+    n_neighbors: 5
+  intrinsic_dimension:
+    method: "twonn"
+  neighborhood_distortion:
+    k: 5
+
+semantic_metrics:
+  - nli_entailment
+  - nli_contradiction
+  - self_consistency
+
+nli_model: "cross-encoder/nli-deberta-v3-base"
