@@ -1,0 +1,29 @@
+phase: 3
+name: "poc_layerwise_decision_geometry"
+
+model:
+  alias: "mock-tiny"
+
+device: "cpu"
+max_new_tokens: 8
+
+layer_schedule:
+  mode: "all"
+  extract_logits: true
+
+curvature_proxies:
+  - trajectory_divergence
+  - intrinsic_dimension
+  - neighborhood_distortion
+
+semantic_metrics:
+  - nli_entailment
+  - self_consistency
+
+domains:
+  low_curvature:
+    - "poc_arithmetic"
+  high_curvature:
+    - "poc_speculative"
+
+prompts_per_domain: 2

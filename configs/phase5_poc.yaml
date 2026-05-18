@@ -1,0 +1,41 @@
+phase: 5
+name: "poc_synthetic_ontology_test"
+
+device: "cpu"
+
+ontology:
+  num_entities: 20
+  num_relations: 4
+  num_rules: 4
+  num_bridge_concepts: 4
+  num_contradictions: 1
+  graph_density: 0.20
+  seed: 42
+
+corpus:
+  train_size: 20
+  val_size: 5
+
+toy_model:
+  hidden_size: 32
+  num_layers: 2
+  num_heads: 2
+  max_position_embeddings: 64
+  vocab_size: 200
+
+training:
+  skip_training: true
+  num_epochs: 1
+  batch_size: 4
+
+probing:
+  n_prompts_per_bridge: 2
+  curvature_proxies:
+    - trajectory_divergence
+    - intrinsic_dimension
+  semantic_metrics:
+    - nli_entailment
+    - self_consistency
+
+causal_test:
+  n_add_remove_cycles: 1

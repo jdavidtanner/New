@@ -117,19 +117,23 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
             )
 
             cycle_dir = model_dir / f"cycle_{cycle}" / label
-            model = train_toy_model(
-                train_sents, val_sents, output_dir=cycle_dir,
-                hidden_size=model_cfg.get("hidden_size", 128),
-                num_layers=model_cfg.get("num_layers", 4),
-                num_heads=model_cfg.get("num_heads", 4),
-                max_position_embeddings=model_cfg.get("max_position_embeddings", 256),
-                vocab_size=model_cfg.get("vocab_size", 2000),
-                num_epochs=train_cfg.get("num_epochs", 20),
-                batch_size=train_cfg.get("batch_size", 32),
-                learning_rate=train_cfg.get("learning_rate", 3e-4),
-                warmup_steps=train_cfg.get("warmup_steps", 100),
-                checkpoint_every=train_cfg.get("checkpoint_every", 5),
-            )
+            if train_cfg.get("skip_training", False):
+                logger.info("Skipping toy model training for cycle %d %s", cycle, label)
+                model = None
+            else:
+                model = train_toy_model(
+                    train_sents, val_sents, output_dir=cycle_dir,
+                    hidden_size=model_cfg.get("hidden_size", 128),
+                    num_layers=model_cfg.get("num_layers", 4),
+                    num_heads=model_cfg.get("num_heads", 4),
+                    max_position_embeddings=model_cfg.get("max_position_embeddings", 256),
+                    vocab_size=model_cfg.get("vocab_size", 2000),
+                    num_epochs=train_cfg.get("num_epochs", 20),
+                    batch_size=train_cfg.get("batch_size", 32),
+                    learning_rate=train_cfg.get("learning_rate", 3e-4),
+                    warmup_steps=train_cfg.get("warmup_steps", 100),
+                    checkpoint_every=train_cfg.get("checkpoint_every", 5),
+                )
 
             bridge_probes = build_bridge_probes(full_ontology, n_per_bridge=probe_cfg.get("n_prompts_per_bridge", 10))
             non_bridge_probes = build_non_bridge_probes(full_ontology, n=len(bridge_probes))

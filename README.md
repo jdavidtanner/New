@@ -32,6 +32,21 @@ python -m pytest tests/unit
 python -m compileall -q curvature_semantics tests
 ```
 
+
+## Proof-of-concept run
+
+The repository includes download-free proof-of-concept configs that use the built-in `mock-tiny` model and synthetic datasets. These are intended to validate orchestration for every phase on a CPU-only machine:
+
+```bash
+for p in 1 2 3 4 5 6; do
+  python -m curvature_semantics.phases.phase${p}.cli \
+    --config configs/phase${p}_poc.yaml \
+    --output-dir /tmp/curvature_poc
+done
+```
+
+These POC runs are not scientifically meaningful model evaluations; they are smoke tests for data flow, artifact generation, curvature/semantic metric computation, and phase-to-phase orchestration.
+
 ## CLI entry points
 
 ```bash

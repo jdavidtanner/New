@@ -55,7 +55,7 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
     n_examples = eval_cfg.get("n_examples", 100)
 
     # Load evaluation data
-    eval_domain = "historical_dates"
+    eval_domain = eval_cfg.get("domain", "historical_dates")
     examples = load_domain_examples(eval_domain, n=n_examples, seed=cfg.seed)
     gold_answers = [ex.get("answer", "") for ex in examples]
 

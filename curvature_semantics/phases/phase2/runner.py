@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -62,8 +63,15 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
 
         try:
             result = phase1_run(p1_cfg)
-            p1_store = ArtifactStore.from_config(p1_cfg)
-            df = p1_store.load_df("features")
+            result_dir = Path(result["output_dir"])
+            parquet_path = result_dir / "features.parquet"
+            pickle_path = result_dir / "features.pkl"
+            if parquet_path.exists():
+                df = pd.read_parquet(parquet_path)
+            elif pickle_path.exists():
+                df = pd.read_pickle(pickle_path)
+            else:
+                raise FileNotFoundError(f"No Phase 1 features artifact in {result_dir}")
             results_by_model[alias] = df
         except Exception as exc:
             logger.warning("Phase 1 failed for %s: %s", alias, exc)

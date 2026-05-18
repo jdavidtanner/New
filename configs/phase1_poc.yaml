@@ -1,0 +1,32 @@
+phase: 1
+name: "poc_observational_mapping"
+
+model:
+  alias: "mock-tiny"
+
+device: "cpu"
+max_new_tokens: 8
+
+domains:
+  low_curvature:
+    - "poc_arithmetic"
+  high_curvature:
+    - "poc_speculative"
+
+prompts_per_domain: 2
+perturbations_per_prompt: 2
+
+perturbations:
+  text:
+    - sentence_reorder
+    - distractor_insertion
+
+curvature_proxies:
+  - trajectory_divergence
+  - intrinsic_dimension
+  - neighborhood_distortion
+
+semantic_metrics:
+  - nli_entailment
+  - nli_contradiction
+  - evidence_utilization
