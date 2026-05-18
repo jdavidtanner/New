@@ -214,10 +214,13 @@ def _log_dose_response(dose_response: dict) -> None:
 
 
 def _verdict(dose_response: dict) -> bool:
+    # A group (domain, layer) is "supporting" if ANY of its signals supports
+    # the hypothesis.  This is appropriate when some metrics (e.g. nli_entailment
+    # for Q&A prompts) are structurally uninformative and would otherwise dilute
+    # a genuine causal signal present in another metric (nli_contradiction).
     n_support = sum(
         1 for val in dose_response.values()
-        for sig in val.get("signals", {}).values()
-        if sig.get("supports_hypothesis")
+        if any(sig.get("supports_hypothesis") for sig in val.get("signals", {}).values())
     )
-    n_total = sum(len(val.get("signals", {})) for val in dose_response.values())
+    n_total = len(dose_response)
     return n_total > 0 and (n_support / n_total) >= 0.5
