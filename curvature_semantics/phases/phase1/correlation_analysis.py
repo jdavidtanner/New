@@ -41,8 +41,8 @@ def compute_correlation_matrix(
                 r, p = stats.spearmanr(x, y)
             else:
                 r, p = stats.pearsonr(x, y)
-            row[s] = float(r)
-            row[f"{s}_p"] = float(p)
+            row[s] = float(r) if np.isfinite(r) else 0.0
+            row[f"{s}_p"] = float(p) if np.isfinite(p) else 1.0
         rows.append(row)
     return pd.DataFrame(rows).set_index("curvature_proxy")
 
@@ -70,9 +70,9 @@ def compute_partial_correlations(
                 r, p = partial_correlation(x, y, controls)
             else:
                 r, p = stats.pearsonr(x, y)
-            row[s] = float(r)
-            row[f"{s}_p"] = float(p)
-            p_values.append(float(p))
+            row[s] = float(r) if np.isfinite(r) else 0.0
+            row[f"{s}_p"] = float(p) if np.isfinite(p) else 1.0
+            p_values.append(float(p) if np.isfinite(p) else 1.0)
         rows.append(row)
 
     result = pd.DataFrame(rows).set_index("curvature_proxy")
@@ -90,10 +90,15 @@ def summarise_findings(corr_df: pd.DataFrame, partial_df: pd.DataFrame) -> dict:
     """Return key findings from correlation analysis."""
     findings = {}
     for col in COMPLETENESS_COLS:
-        if col in corr_df.columns:
-            top_predictor = corr_df[col].abs().idxmax()
-            findings[f"top_curvature_predictor_of_{col}"] = {
-                "predictor": top_predictor,
-                "r_spearman": float(corr_df.loc[top_predictor, col]),
-            }
+        if col not in corr_df.columns:
+            continue
+        series = corr_df[col].abs().dropna()
+        if series.empty:
+            findings[f"top_curvature_predictor_of_{col}"] = {"predictor": None, "r_spearman": None}
+            continue
+        top_predictor = series.idxmax()
+        findings[f"top_curvature_predictor_of_{col}"] = {
+            "predictor": top_predictor,
+            "r_spearman": float(corr_df.loc[top_predictor, col]),
+        }
     return findings
