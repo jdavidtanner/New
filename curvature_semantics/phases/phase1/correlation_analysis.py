@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 
-from curvature_semantics.utils.statistical_utils import partial_correlation, fdr_correct
 from curvature_semantics.core.logging_utils import get_logger
+from curvature_semantics.utils.statistical_utils import (
+    fdr_correct,
+    partial_correlation,
+    pearsonr,
+    spearmanr,
+)
 
 logger = get_logger(__name__)
 
@@ -38,9 +42,9 @@ def compute_correlation_matrix(
             x = df[c].fillna(0).values
             y = df[s].fillna(0).values
             if method == "spearman":
-                r, p = stats.spearmanr(x, y)
+                r, p = spearmanr(x, y)
             else:
-                r, p = stats.pearsonr(x, y)
+                r, p = pearsonr(x, y)
             row[s] = float(r)
             row[f"{s}_p"] = float(p)
         rows.append(row)
@@ -69,7 +73,7 @@ def compute_partial_correlations(
             if controls is not None and len(controls) > 0:
                 r, p = partial_correlation(x, y, controls)
             else:
-                r, p = stats.pearsonr(x, y)
+                r, p = pearsonr(x, y)
             row[s] = float(r)
             row[f"{s}_p"] = float(p)
             p_values.append(float(p))

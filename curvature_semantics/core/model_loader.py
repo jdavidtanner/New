@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import torch
 from typing import Any
+
+import torch
 
 from curvature_semantics.core.logging_utils import get_logger
 
@@ -14,6 +15,17 @@ _DTYPE_MAP = {
     "float16": torch.float16,
     "bfloat16": torch.bfloat16,
 }
+
+
+def resolve_device(device: str = "cuda") -> str:
+    """Return an available torch device, falling back to CPU when necessary."""
+    if device == "cuda" and not torch.cuda.is_available():
+        logger.warning("CUDA requested but unavailable; falling back to CPU")
+        return "cpu"
+    if device == "mps" and not (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()):
+        logger.warning("MPS requested but unavailable; falling back to CPU")
+        return "cpu"
+    return device
 
 
 def load_model_and_tokenizer(
@@ -30,6 +42,7 @@ def load_model_and_tokenizer(
     """
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
+    device = resolve_device(device)
     logger.info("Loading tokenizer: %s", model_id)
     tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
     if tokenizer.pad_token is None:

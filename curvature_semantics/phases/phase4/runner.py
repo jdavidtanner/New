@@ -8,19 +8,19 @@ import numpy as np
 import pandas as pd
 import torch
 
-from curvature_semantics.core.config_manager import ExperimentConfig
 from curvature_semantics.core.artifact_store import ArtifactStore
+from curvature_semantics.core.config_manager import ExperimentConfig
 from curvature_semantics.core.dataset_loader import load_domain_examples
+from curvature_semantics.core.hidden_state_extractor import HiddenStateExtractor
 from curvature_semantics.core.logging_utils import get_logger
 from curvature_semantics.core.model_loader import load_model_and_tokenizer
-from curvature_semantics.core.hidden_state_extractor import HiddenStateExtractor
 from curvature_semantics.curvature.curvature_aggregator import CurvatureAggregator
-from curvature_semantics.semantics.completeness_aggregator import CompletenessAggregator
-from curvature_semantics.semantics.nli_scorer import NLIScorer
-from curvature_semantics.phases.phase4.evidence_inserter import build_evidence_variants
 from curvature_semantics.phases.phase4.bridge_concept_adder import build_bridge_variants
 from curvature_semantics.phases.phase4.contradiction_remover import build_decontradicted_variants
 from curvature_semantics.phases.phase4.curvature_aware_retrieval import CurvatureAwareRetriever
+from curvature_semantics.phases.phase4.evidence_inserter import build_evidence_variants
+from curvature_semantics.semantics.completeness_aggregator import CompletenessAggregator
+from curvature_semantics.semantics.nli_scorer import NLIScorer
 from curvature_semantics.visualization.phase_space import plot_intervention_delta
 
 logger = get_logger(__name__)
@@ -36,34 +36,42 @@ def _score_examples(
     cfg: ExperimentConfig,
     intervention_label: str = "none",
 ) -> list[dict[str, Any]]:
-    rows = []
+    rows: list[dict[str, Any]] = []
+    hidden_by_example: list[np.ndarray] = []
+    row_metadata: list[dict[str, Any]] = []
+
     for ex in examples:
         prompt = ex["prompt"]
         context = ex.get("context", "")
         reference = ex.get("answer", "")
         inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding=True)
         bundle = extractor.extract(inputs["input_ids"], inputs.get("attention_mask"))
-        hs = bundle.last_token_array()
+        hidden_by_example.append(bundle.last_token_array()[:, 0, :])
 
         with torch.no_grad():
             gen_ids = model.generate(
-                inputs["input_ids"].to(cfg.device),
+                inputs["input_ids"].to(next(model.parameters()).device),
                 max_new_tokens=cfg.max_new_tokens,
-                temperature=None, do_sample=False,
+                temperature=None,
+                do_sample=False,
                 pad_token_id=tokenizer.eos_token_id,
             )
         response = tokenizer.decode(gen_ids[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
         sem = sem_agg.score(prompt, response, context=context, reference=reference, domain=ex.get("domain", ""))
-
-        # Use middle layer for curvature summary
-        mid_layer = hs.shape[0] // 2
-        curv = curv_agg.compute_layer(hs[mid_layer, :, :][np.newaxis, :] if hs.ndim == 3 else hs[mid_layer:mid_layer+1], layer_idx=mid_layer)
-        rows.append({
+        row_metadata.append({
             "domain": ex.get("domain", ""),
             "intervention": intervention_label,
-            **curv.metrics,
             **sem.metrics,
         })
+
+    if not hidden_by_example:
+        return rows
+
+    stacked = np.stack(hidden_by_example, axis=1)  # (n_layers, n_examples, hidden_dim)
+    mid_layer = stacked.shape[0] // 2
+    curv = curv_agg.compute_layer(stacked[mid_layer], layer_idx=mid_layer)
+    for metadata in row_metadata:
+        rows.append({**metadata, **curv.metrics})
     return rows
 
 
@@ -73,7 +81,11 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
 
     model_spec = cfg.model
     model, tokenizer = load_model_and_tokenizer(
-        model_spec.id, device=cfg.device, dtype=cfg.dtype,
+        model_spec.id,
+        device=cfg.device,
+        dtype=cfg.dtype,
+        load_in_8bit=model_spec.load_in_8bit,
+        load_in_4bit=model_spec.load_in_4bit,
     )
     extractor = HiddenStateExtractor(model, extract_logits=False)
     curv_agg = CurvatureAggregator.from_config(cfg)

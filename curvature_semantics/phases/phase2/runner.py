@@ -47,9 +47,16 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
 
         if cfg.use_cached:
             cached = ArtifactStore.from_config(p1_cfg).latest_run_dir(phase=1)
-            if cached and (cached / "features.parquet").exists():
+            parquet_path = cached / "features.parquet" if cached else None
+            pickle_path = cached / "features.pkl" if cached else None
+            if cached and parquet_path.exists():
                 logger.info("Using cached Phase 1 results for %s", alias)
-                df = pd.read_parquet(cached / "features.parquet")
+                df = pd.read_parquet(parquet_path)
+                results_by_model[alias] = df
+                continue
+            if cached and pickle_path.exists():
+                logger.info("Using cached Phase 1 fallback results for %s", alias)
+                df = pd.read_pickle(pickle_path)
                 results_by_model[alias] = df
                 continue
 
