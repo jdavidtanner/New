@@ -31,6 +31,17 @@ from curvature_semantics.phases.phase3.activation_patcher import ActivationPatch
 logger = get_logger(__name__)
 
 
+def _apply_chat_template(tokenizer, prompt: str) -> str:
+    """Wrap prompt in chat format when the tokenizer supports it."""
+    if hasattr(tokenizer, "apply_chat_template") and tokenizer.chat_template:
+        return tokenizer.apply_chat_template(
+            [{"role": "user", "content": prompt}],
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+    return prompt
+
+
 def _generate(model, tokenizer, input_ids, cfg) -> str:
     with torch.no_grad():
         gen_ids = model.generate(
@@ -85,9 +96,10 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
                 responses: list[str] = []
 
                 for ex in examples:
+                    formatted = _apply_chat_template(tokenizer, ex["prompt"])
                     inputs = tokenizer(
-                        ex["prompt"], return_tensors="pt",
-                        truncation=True, max_length=256, padding=False,
+                        formatted, return_tensors="pt",
+                        truncation=True, max_length=512, padding=False,
                     )
                     with patcher.patch(target_layer, alpha):
                         response = _generate(model, tokenizer, inputs["input_ids"], cfg)
@@ -177,10 +189,16 @@ def _dose_response_analysis(df: pd.DataFrame) -> dict[str, Any]:
             if not np.isfinite(r):
                 continue
 
+            # entailment should fall with more noise (r < 0 supports hypothesis)
+            # contradiction should rise with more noise (r > 0 supports hypothesis)
+            if col == "nli_contradiction":
+                supports = bool(r > 0 and p < 0.10)
+            else:
+                supports = bool(r < 0 and p < 0.10)
             results[key]["signals"][col] = {
                 "spearman_r": float(r),
                 "p_value": float(p),
-                "supports_hypothesis": bool(r < 0 and p < 0.10),
+                "supports_hypothesis": supports,
                 "per_alpha_means": {str(a): float(y_by_alpha[a]) for a in sorted(y_by_alpha)},
             }
 

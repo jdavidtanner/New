@@ -71,6 +71,13 @@ models:
     params_billions: 0.5
     alias: "qwen-0.5b-base"
 
+  - id: "Qwen/Qwen2.5-0.5B-Instruct"
+    family: "qwen"
+    type: "dense"
+    tuning: "instruct"
+    params_billions: 0.5
+    alias: "qwen-0.5b-instruct"
+
   - id: "Qwen/Qwen2.5-1.5B-Instruct"
     family: "qwen"
     type: "dense"

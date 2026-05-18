@@ -2,7 +2,7 @@ phase: 3
 name: "causal_activation_patching"
 
 model:
-  alias: "qwen-0.5b-base"
+  alias: "qwen-0.5b-instruct"
   load_in_8bit: false
   load_in_4bit: false
 
@@ -19,14 +19,14 @@ domains:
   high_curvature:
     - "medical_advice"
 
-prompts_per_domain: 8
+prompts_per_domain: 12
 
 # Layers to target: early (layer 3), middle (layer 12), late (layer 21) for Qwen-0.5B (24 layers)
 target_layers: [3, 12, 21]
 
 # Noise levels as fraction of activation norm
 # 0.0 = clean baseline; higher = more geometric distortion
-noise_alphas: [0.0, 0.05, 0.1, 0.3, 1.0]
+noise_alphas: [0.0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.5, 1.0]
 
 curvature_proxies:
   - trajectory_divergence
