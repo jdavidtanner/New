@@ -1,4 +1,26 @@
 models:
+  # GPT-2 family — small, fast on CPU, different architecture from Qwen/LLaMA
+  - id: "openai-community/gpt2"
+    family: "gpt2"
+    type: "dense"
+    tuning: "base"
+    params_billions: 0.124
+    alias: "gpt2-base"
+
+  - id: "openai-community/gpt2-medium"
+    family: "gpt2"
+    type: "dense"
+    tuning: "base"
+    params_billions: 0.345
+    alias: "gpt2-medium-base"
+
+  - id: "openai-community/gpt2-large"
+    family: "gpt2"
+    type: "dense"
+    tuning: "base"
+    params_billions: 0.774
+    alias: "gpt2-large-base"
+
   # Dense decoder-only — baseline architecture
   - id: "meta-llama/Llama-3.2-1B"
     family: "llama"

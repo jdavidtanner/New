@@ -1,0 +1,23 @@
+phase: 2
+name: "cross_architecture_replication_quick"
+
+# Three models: two architectures, three sizes
+# gpt2 family: different arch from Qwen (no RoPE, GELU, 12/24 layers)
+# qwen: already have Phase 1 results; use_cached picks them up if present
+model_sweep:
+  - "gpt2-base"
+  - "gpt2-medium-base"
+  - "qwen-0.5b-base"
+
+phase1_config: "configs/phase1_for_p2.yaml"
+
+comparison:
+  effect_size_metric: "cohens_d"
+  significance_level: 0.05
+  fdr_correction: true
+  min_replications_for_support: 2   # 3 models total; 2/3 = replication
+
+device: "cpu"
+dtype: "float32"
+seed: 42
+output_root: "results"

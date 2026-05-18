@@ -6,12 +6,15 @@ from typing import Any
 
 import pandas as pd
 
+from pathlib import Path
+
 from curvature_semantics.core.config_manager import ConfigManager, ExperimentConfig
 from curvature_semantics.core.artifact_store import ArtifactStore
 from curvature_semantics.core.logging_utils import get_logger
 from curvature_semantics.phases.phase1.runner import run as phase1_run
 from curvature_semantics.phases.phase2.architecture_comparator import (
     compare_across_architectures, compute_effect_sizes, replication_summary,
+    per_layer_correlations,
 )
 
 logger = get_logger(__name__)
@@ -32,12 +35,13 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
             logger.warning("Model alias '%s' not found in registry; skipping", alias)
             continue
 
-        # Build a per-model Phase 1 config
+        # Build a per-model Phase 1 config — keep phase=1 so artifacts land in phase1/
         p1_config_path = cfg.raw.get("phase1_config", None)
+        p1_output_root = str(store.phase_dir / alias)
         overrides = {
             "model": {"alias": alias},
-            "phase": 2,
-            "output_root": str(store.phase_dir / alias),
+            "phase": 1,
+            "output_root": p1_output_root,
         }
         if p1_config_path:
             mgr = ConfigManager(phase_config=p1_config_path, overrides=overrides)
@@ -46,18 +50,22 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
         p1_cfg = mgr.build()
 
         if cfg.use_cached:
-            cached = ArtifactStore.from_config(p1_cfg).latest_run_dir(phase=1)
-            if cached and (cached / "features.parquet").exists():
-                logger.info("Using cached Phase 1 results for %s", alias)
-                df = pd.read_parquet(cached / "features.parquet")
-                results_by_model[alias] = df
-                continue
+            p1_phase_root = store.phase_dir / alias / "phase1"
+            if p1_phase_root.exists():
+                run_dirs = sorted(p1_phase_root.iterdir(), key=lambda p: p.name)
+                for rd in reversed(run_dirs):
+                    fp = rd / "features.parquet"
+                    if fp.exists():
+                        logger.info("Using cached Phase 1 results for %s from %s", alias, rd.name)
+                        results_by_model[alias] = pd.read_parquet(fp)
+                        break
+                if alias in results_by_model:
+                    continue
 
         try:
             result = phase1_run(p1_cfg)
-            p1_store = ArtifactStore.from_config(p1_cfg)
-            df = p1_store.load_df("features")
-            results_by_model[alias] = df
+            features_path = Path(result["output_dir"]) / "features.parquet"
+            results_by_model[alias] = pd.read_parquet(features_path)
         except Exception as exc:
             logger.warning("Phase 1 failed for %s: %s", alias, exc)
             continue
@@ -72,13 +80,21 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
 
     comparison = compare_across_architectures(results_by_model)
     effect_sizes = compute_effect_sizes(results_by_model, split_col="model_tuning")
-    summary = replication_summary(results_by_model)
+    summary = replication_summary(results_by_model, min_replications=cfg.raw.get("comparison", {}).get("min_replications_for_support", 2))
+    layer_corr_df = per_layer_correlations(results_by_model)
 
-    store.save_json("architecture_comparison", comparison.to_dict())
+    store.save_json("architecture_comparison", comparison.reset_index(drop=True).to_dict(orient="records"))
     store.save_json("effect_sizes", effect_sizes)
     store.save_json("replication_summary", summary)
+    store.save_df("layer_correlations", layer_corr_df)
 
     logger.info("Phase 2 complete. Replication rate: %.2f", summary.get("replication_rate", 0))
+    logger.info("Hypothesis supported: %s", summary.get("hypothesis_supported"))
+
+    for sig_key, sig_val in summary.get("signals", {}).items():
+        logger.info("  Signal %s: mean_r=%.3f  significant in %s",
+                    sig_key, sig_val["mean_spearman_r"], sig_val["significant_models"])
+
     return {
         "n_models": len(results_by_model),
         "replication_summary": summary,

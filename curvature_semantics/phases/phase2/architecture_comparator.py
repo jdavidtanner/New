@@ -76,29 +76,86 @@ def replication_summary(
     min_replications: int = 4,
     significance_level: float = 0.05,
 ) -> dict[str, Any]:
-    """Summarise replication success across architectures."""
-    significant_models = []
-    all_r = []
+    """Summarise replication success across architectures.
 
+    Tests two signals found in Phase 1:
+      (A) trajectory_divergence → nli_entailment
+      (B) intrinsic_dimension   → nli_contradiction  (strongest in Phase 1: r=−0.735 at layer 12)
+    """
+    tests = [
+        ("trajectory_divergence", "nli_entailment"),
+        ("intrinsic_dimension", "nli_contradiction"),
+    ]
+    results: dict[str, Any] = {"n_models_tested": len(results_by_model), "signals": {}}
+
+    for curv_col, comp_col in tests:
+        significant_models = []
+        all_r: list[float] = []
+        for alias, df in results_by_model.items():
+            if curv_col not in df.columns or comp_col not in df.columns:
+                continue
+            x = df[curv_col].replace([np.inf, -np.inf], np.nan).dropna().values
+            y = df[comp_col].dropna().values
+            n = min(len(x), len(y))
+            if n < 5:
+                continue
+            r, p = stats.spearmanr(x[:n], y[:n])
+            if np.isfinite(r):
+                all_r.append(float(r))
+                if p < significance_level:
+                    significant_models.append(alias)
+
+        key = f"{curv_col}__{comp_col}"
+        results["signals"][key] = {
+            "n_significant": len(significant_models),
+            "significant_models": significant_models,
+            "replication_rate": len(significant_models) / max(len(results_by_model), 1),
+            "mean_spearman_r": float(np.mean(all_r)) if all_r else 0.0,
+            "effect_direction_consistent": (
+                all(r < 0 for r in all_r) or all(r > 0 for r in all_r)
+            ) if all_r else False,
+        }
+
+    # Primary verdict: either signal replicates in ≥ min_replications models
+    n_sig_primary = results["signals"].get("trajectory_divergence__nli_entailment", {}).get("n_significant", 0)
+    n_sig_secondary = results["signals"].get("intrinsic_dimension__nli_contradiction", {}).get("n_significant", 0)
+    results["hypothesis_supported"] = max(n_sig_primary, n_sig_secondary) >= min_replications
+    results["replication_rate"] = max(
+        results["signals"][k]["replication_rate"] for k in results["signals"]
+    ) if results["signals"] else 0.0
+    return results
+
+
+def per_layer_correlations(
+    results_by_model: dict[str, pd.DataFrame],
+    curvature_col: str = "intrinsic_dimension",
+    completeness_col: str = "nli_contradiction",
+) -> pd.DataFrame:
+    """Compute curvature→completeness correlation at each relative layer depth (0.0–1.0).
+
+    Normalises layer_idx by total layers per model so curves are comparable across
+    architectures with different numbers of layers.
+    """
+    rows = []
     for alias, df in results_by_model.items():
-        if "trajectory_divergence" not in df.columns or "nli_entailment" not in df.columns:
+        if curvature_col not in df.columns or completeness_col not in df.columns:
             continue
-        x = df["trajectory_divergence"].dropna().values
-        y = df["nli_entailment"].dropna().values
-        if len(x) < 5:
+        if "layer_idx" not in df.columns:
             continue
-        r, p = stats.spearmanr(x, y)
-        all_r.append(float(r))
-        if p < significance_level:
-            significant_models.append(alias)
-
-    n_models = len(results_by_model)
-    return {
-        "n_models_tested": n_models,
-        "n_significant": len(significant_models),
-        "significant_models": significant_models,
-        "replication_rate": len(significant_models) / max(n_models, 1),
-        "hypothesis_supported": len(significant_models) >= min_replications,
-        "mean_spearman_r": float(np.mean(all_r)) if all_r else 0.0,
-        "effect_direction_consistent": all(r < 0 for r in all_r) or all(r > 0 for r in all_r),
-    }
+        n_layers = df["layer_idx"].max() + 1
+        for layer_idx, grp in df.groupby("layer_idx"):
+            x = grp[curvature_col].replace([np.inf, -np.inf], np.nan).dropna().values
+            y = grp[completeness_col].dropna().values
+            n = min(len(x), len(y))
+            if n < 3:
+                continue
+            r, p = stats.spearmanr(x[:n], y[:n])
+            rows.append({
+                "model_alias": alias,
+                "layer_idx": int(layer_idx),
+                "layer_rel": float(layer_idx) / max(n_layers - 1, 1),
+                "spearman_r": float(r) if np.isfinite(r) else 0.0,
+                "p_value": float(p) if np.isfinite(p) else 1.0,
+                "n": n,
+            })
+    return pd.DataFrame(rows)

@@ -1,0 +1,46 @@
+phase: 1
+name: "p2_subrun"
+
+device: "cpu"
+dtype: "float32"
+max_new_tokens: 30
+temperature: 0.0
+seed: 42
+
+domains:
+  low_curvature:
+    - "arithmetic"
+    - "basic_physics"
+  high_curvature:
+    - "speculative_medicine"
+
+prompts_per_domain: 8
+perturbations_per_prompt: 1
+
+layers:
+  extract_all: true   # handles variable layer counts across architectures
+
+perturbations:
+  text:
+    - synonym_substitution
+  embedding: []
+
+curvature_proxies:
+  - trajectory_divergence
+  - intrinsic_dimension
+  - neighborhood_distortion
+
+curvature_params:
+  trajectory_divergence:
+    n_neighbors: 5
+  intrinsic_dimension:
+    method: "twonn"
+  neighborhood_distortion:
+    k: 5
+
+semantic_metrics:
+  - nli_entailment
+  - nli_contradiction
+  - self_consistency
+
+nli_model: "cross-encoder/nli-deberta-v3-base"
