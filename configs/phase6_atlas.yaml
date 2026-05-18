@@ -13,13 +13,12 @@ num_generations: 1
 seed: 42
 
 routing:
-  policy: "threshold"              # "threshold" | "learned" | "rl"
+  policy: "threshold"
+  calibrate_thresholds: true       # fit low/medium from entropy percentiles
   thresholds:
-    low_curvature: 0.3             # answer directly
-    medium_curvature: 0.6          # retrieve evidence
-    high_curvature: 0.85           # ask for clarification / hedge
-    # above 0.85 -> abstain
-
+    low_curvature: 0.3             # overridden by calibration if enabled
+    medium_curvature: 0.6
+    high_curvature: 0.95           # clarify / abstain threshold kept fixed
   curvature_proxy: "trajectory_divergence"
   completeness_signal: "nli_entailment"
 
@@ -35,7 +34,7 @@ baselines:
   self_consistency: true
 
 evaluation:
-  domain: "medical_advice"
+  domain: "arithmetic"
   n_examples: 20
   metrics:
     - accuracy

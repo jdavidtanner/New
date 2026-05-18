@@ -114,6 +114,24 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
             bundle.logits[0, -1, :].float().cpu().numpy() if bundle.logits is not None else None
         )
 
+    # ── Threshold calibration from entropy distribution ───────────────────────
+    if cfg.raw.get("routing", {}).get("calibrate_thresholds", False):
+        entropies = []
+        for lp in all_logits:
+            if lp is not None:
+                p = np.exp(lp - lp.max()); p /= p.sum()
+                entropies.append(float(-np.sum(p * np.log(p + 1e-12))))
+        if entropies:
+            curv_vals = [min(e / 10.0, 1.0) for e in entropies]
+            new_low = float(np.percentile(curv_vals, 40))
+            new_med = float(np.percentile(curv_vals, 75))
+            policy.low = new_low
+            policy.medium = new_med
+            logger.info(
+                "Calibrated thresholds from entropy distribution: low=%.3f  medium=%.3f",
+                new_low, new_med,
+            )
+
     # ── Pass 2: batch curvature at mid-layer ──────────────────────────────────
     n_layers = all_hs[0].shape[0]
     mid = n_layers // 2
