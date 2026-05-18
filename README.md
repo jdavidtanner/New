@@ -38,6 +38,17 @@ python -m compileall -q curvature_semantics tests
 ```
 
 
+
+## Moving toward the goal
+
+The next executable rung is the predictive ladder: collect Phase 1 features, run a held-out baseline-vs-curvature predictive report, and optionally smoke-test the remaining POC phases.
+
+```bash
+python scripts/run_predictive_ladder.py --output-root /tmp/curvature_ladder --run-all-poc-phases
+```
+
+This command does not complete the scientific project; it tells us whether the software path from features to predictive-lift report is working. To make progress on the core hypothesis, replace `--phase1-config configs/phase1_poc.yaml` with a small real-model Phase 1 config and compare the reported baseline-vs-curvature lift.
+
 ## Proof-of-concept run
 
 The repository includes download-free proof-of-concept configs that use the built-in `mock-tiny` model and synthetic datasets. These are intended to validate orchestration for every phase on a CPU-only machine:

@@ -44,3 +44,14 @@ or, if parquet support is unavailable:
 ```bash
 curvature-predict --data /path/to/features.pkl --output-dir results/prediction
 ```
+
+
+## Execution ladder
+
+Use `scripts/run_predictive_ladder.py` as the default way to move one rung forward. It performs:
+
+1. Phase 1 feature collection.
+2. Held-out predictive reporting via `curvature-predict`.
+3. Optional Phase 2-6 POC smoke tests.
+
+The first meaningful research upgrade is to keep the same ladder but swap in a small real-model Phase 1 config. Completion of the project requires repeated evidence that curvature-enhanced models outperform baseline-only models on held-out data, followed by intervention and routing tests that preserve or improve that signal.
