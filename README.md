@@ -39,6 +39,31 @@ python -m compileall -q curvature_semantics tests
 
 
 
+
+## Controlled predictive calibration
+
+Before spending GPU time, verify the evaluator can recover a known curvature signal:
+
+```bash
+FEATURES=$(python scripts/generate_controlled_features.py --output /tmp/controlled_features.parquet)
+curvature-predict --data "$FEATURES" --output-dir /tmp/controlled_prediction
+```
+
+This is a calibration fixture, not evidence for the hypothesis. It should show positive lift for the curvature-enhanced model because the target is constructed from curvature features.
+
+
+## Real-model smoke rung
+
+When network/model downloads are available, run the same ladder against a tiny Hugging Face model:
+
+```bash
+python scripts/run_predictive_ladder.py \
+  --phase1-config configs/phase1_real_smoke.yaml \
+  --output-root /tmp/curvature_real_ladder
+```
+
+This is the first non-mock execution rung. It is still a smoke test, but it exercises real `transformers` model loading and hidden-state extraction.
+
 ## Moving toward the goal
 
 The next executable rung is the predictive ladder: collect Phase 1 features, run a held-out baseline-vs-curvature predictive report, and optionally smoke-test the remaining POC phases.
