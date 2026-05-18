@@ -1,0 +1,34 @@
+phase: 4
+name: "poc_intervention_testing"
+
+model:
+  alias: "mock-tiny"
+
+device: "cpu"
+max_new_tokens: 8
+
+domains:
+  - "poc_speculative"
+
+prompts_per_domain: 2
+
+curvature_proxies:
+  - trajectory_divergence
+  - intrinsic_dimension
+
+semantic_metrics:
+  - nli_entailment
+  - evidence_utilization
+
+interventions:
+  evidence_insertion:
+    enabled: true
+    num_sentences: 1
+  bridge_concept:
+    enabled: true
+    max_concepts: 1
+  contradiction_removal:
+    enabled: true
+    nli_threshold: 0.7
+  curvature_aware_retrieval:
+    enabled: false

@@ -41,11 +41,21 @@ class ArtifactStore:
     # ------------------------------------------------------------------
     def save_df(self, name: str, df: pd.DataFrame, subdir: str = "") -> Path:
         p = self.path(subdir, f"{name}.parquet") if subdir else self.path(f"{name}.parquet")
-        df.to_parquet(p, index=True)
-        return p
+        try:
+            df.to_parquet(p, index=True)
+            return p
+        except Exception:
+            fallback = p.with_suffix(".pkl")
+            df.to_pickle(fallback)
+            return fallback
 
     def load_df(self, name: str, subdir: str = "") -> pd.DataFrame:
         p = self.path(subdir, f"{name}.parquet") if subdir else self.path(f"{name}.parquet")
+        if p.exists():
+            return pd.read_parquet(p)
+        fallback = p.with_suffix(".pkl")
+        if fallback.exists():
+            return pd.read_pickle(fallback)
         return pd.read_parquet(p)
 
     # ------------------------------------------------------------------
@@ -90,7 +100,7 @@ class ArtifactStore:
         return runs[-1] if runs else None
 
     @classmethod
-    def from_config(cls, cfg: Any) -> "ArtifactStore":
+    def from_config(cls, cfg: Any) -> ArtifactStore:
         return cls(
             output_root=cfg.output_root,
             phase=cfg.phase,

@@ -6,9 +6,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from scipy import stats
-
-from curvature_semantics.utils.statistical_utils import cohens_d, eta_squared, fdr_correct
+from curvature_semantics.utils.statistical_utils import cohens_d, eta_squared, fdr_correct, spearmanr
 from curvature_semantics.core.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -29,7 +27,7 @@ def compare_across_architectures(
             continue
         curv = df[curvature_col].dropna().values
         comp = df[completeness_col].dropna().values
-        r, p = stats.spearmanr(curv, comp) if len(curv) > 1 else (0.0, 1.0)
+        r, p = spearmanr(curv, comp) if len(curv) > 1 else (0.0, 1.0)
         rows.append({
             "model_alias": alias,
             f"{curvature_col}_mean": float(curv.mean()),
@@ -87,7 +85,7 @@ def replication_summary(
         y = df["nli_entailment"].dropna().values
         if len(x) < 5:
             continue
-        r, p = stats.spearmanr(x, y)
+        r, p = spearmanr(x, y)
         all_r.append(float(r))
         if p < significance_level:
             significant_models.append(alias)

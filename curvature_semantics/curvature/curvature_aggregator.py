@@ -7,14 +7,14 @@ from typing import Any
 
 import numpy as np
 
-from curvature_semantics.curvature.trajectory_divergence import LocalTrajectoryDivergence
+from curvature_semantics.core.logging_utils import get_logger
+from curvature_semantics.curvature.base import CurvatureProxy
+from curvature_semantics.curvature.geodesic_deviation import GeodesicDeviationProxy
 from curvature_semantics.curvature.intrinsic_dimension import IntrinsicDimension
 from curvature_semantics.curvature.neighborhood_distortion import NeighborhoodDistortionRatio
-from curvature_semantics.curvature.geodesic_deviation import GeodesicDeviationProxy
-from curvature_semantics.curvature.ricci_graph_curvature import RicciGraphCurvature
 from curvature_semantics.curvature.persistent_homology import PersistentHomologyFeatures
-from curvature_semantics.curvature.base import CurvatureProxy
-from curvature_semantics.core.logging_utils import get_logger
+from curvature_semantics.curvature.ricci_graph_curvature import RicciGraphCurvature
+from curvature_semantics.curvature.trajectory_divergence import LocalTrajectoryDivergence
 
 logger = get_logger(__name__)
 
@@ -63,7 +63,7 @@ class CurvatureAggregator:
             self.proxies.append(cls(**params))
 
     @classmethod
-    def from_config(cls, cfg: Any) -> "CurvatureAggregator":
+    def from_config(cls, cfg: Any) -> CurvatureAggregator:
         proxy_names = cfg.raw.get("curvature_proxies", list(_PROXY_REGISTRY.keys()))
         proxy_params = cfg.raw.get("curvature_params", {})
         return cls(proxy_names=proxy_names, proxy_params=proxy_params)
@@ -75,6 +75,11 @@ class CurvatureAggregator:
             hidden_states: (n_samples, hidden_dim) float array
             layer_idx: which transformer layer this came from
         """
+        hidden_states = np.asarray(hidden_states)
+        if hidden_states.ndim == 1:
+            hidden_states = hidden_states[np.newaxis, :]
+        elif hidden_states.ndim > 2:
+            hidden_states = hidden_states.reshape(-1, hidden_states.shape[-1])
         bundle = CurvatureBundle(layer_idx=layer_idx, n_samples=hidden_states.shape[0])
         for proxy in self.proxies:
             try:

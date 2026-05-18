@@ -76,6 +76,7 @@ curvature-phase4 = "curvature_semantics.phases.phase4.cli:main"
 curvature-phase5 = "curvature_semantics.phases.phase5.cli:main"
 curvature-phase6 = "curvature_semantics.phases.phase6.cli:main"
 curvature-regress = "curvature_semantics.regression.regression_report:main"
+curvature-predict = "curvature_semantics.prediction.predictive_report:main"
 curvature-viz = "curvature_semantics.visualization.curvature_atlas:main"
 
 [tool.setuptools.packages.find]

@@ -4,25 +4,25 @@ from __future__ import annotations
 
 from typing import Any
 
-import numpy as np
-import pandas as pd
 import torch
 
-from curvature_semantics.core.config_manager import ExperimentConfig
 from curvature_semantics.core.artifact_store import ArtifactStore
+from curvature_semantics.core.config_manager import ExperimentConfig
 from curvature_semantics.core.dataset_loader import load_domain_examples
+from curvature_semantics.core.hidden_state_extractor import HiddenStateExtractor
 from curvature_semantics.core.logging_utils import get_logger
 from curvature_semantics.core.model_loader import load_model_and_tokenizer
-from curvature_semantics.core.hidden_state_extractor import HiddenStateExtractor
 from curvature_semantics.curvature.curvature_aggregator import CurvatureAggregator
-from curvature_semantics.semantics.completeness_aggregator import CompletenessAggregator
-from curvature_semantics.phases.phase6.routing_policy import ThresholdPolicy
-from curvature_semantics.phases.phase6.curvature_router import CurvatureAwareRouter
-from curvature_semantics.phases.phase6.baselines.vanilla_baseline import VanillaBaseline
-from curvature_semantics.phases.phase6.baselines.rag_only_baseline import RAGOnlyBaseline
 from curvature_semantics.phases.phase6.baselines.calibrated_baseline import CalibratedBaseline
-from curvature_semantics.phases.phase6.baselines.self_consistency_baseline import SelfConsistencyBaseline
+from curvature_semantics.phases.phase6.baselines.rag_only_baseline import RAGOnlyBaseline
+from curvature_semantics.phases.phase6.baselines.self_consistency_baseline import (
+    SelfConsistencyBaseline,
+)
+from curvature_semantics.phases.phase6.baselines.vanilla_baseline import VanillaBaseline
+from curvature_semantics.phases.phase6.curvature_router import CurvatureAwareRouter
 from curvature_semantics.phases.phase6.evaluator import compare_systems
+from curvature_semantics.phases.phase6.routing_policy import ThresholdPolicy
+from curvature_semantics.semantics.completeness_aggregator import CompletenessAggregator
 
 logger = get_logger(__name__)
 
@@ -33,7 +33,11 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
 
     model_spec = cfg.model
     model, tokenizer = load_model_and_tokenizer(
-        model_spec.id, device=cfg.device, dtype=cfg.dtype,
+        model_spec.id,
+        device=cfg.device,
+        dtype=cfg.dtype,
+        load_in_8bit=model_spec.load_in_8bit,
+        load_in_4bit=model_spec.load_in_4bit,
     )
     extractor = HiddenStateExtractor(model, extract_logits=True)
     curv_agg = CurvatureAggregator.from_config(cfg)
@@ -51,14 +55,16 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
     n_examples = eval_cfg.get("n_examples", 100)
 
     # Load evaluation data
-    eval_domain = "historical_dates"
+    eval_domain = eval_cfg.get("domain", "historical_dates")
     examples = load_domain_examples(eval_domain, n=n_examples, seed=cfg.seed)
     gold_answers = [ex.get("answer", "") for ex in examples]
 
     # Build simple corpus for retrieval (from context fields)
     documents = [ex.get("context", ex["prompt"]) for ex in examples]
     try:
-        from curvature_semantics.phases.phase4.curvature_aware_retrieval import CurvatureAwareRetriever
+        from curvature_semantics.phases.phase4.curvature_aware_retrieval import (
+            CurvatureAwareRetriever,
+        )
         retriever = CurvatureAwareRetriever(
             documents=documents,
             retrieval_model=cfg.raw.get("retrieval", {}).get("model", "sentence-transformers/all-MiniLM-L6-v2"),
@@ -74,7 +80,7 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
         inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding=True)
         with torch.no_grad():
             gen_ids = model.generate(
-                inputs["input_ids"].to(cfg.device),
+                inputs["input_ids"].to(next(model.parameters()).device),
                 max_new_tokens=cfg.max_new_tokens,
                 temperature=None, do_sample=False,
                 pad_token_id=tokenizer.eos_token_id,
@@ -102,7 +108,7 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
         bundle = extractor.extract(inputs["input_ids"], inputs.get("attention_mask"))
         hs_array = bundle.last_token_array()
         mid = hs_array.shape[0] // 2
-        hs = hs_array[mid, :, :][np.newaxis, :]
+        hs = hs_array[mid, :, :]
 
         curv_bundle = curv_agg.compute_layer(hs, layer_idx=mid)
 

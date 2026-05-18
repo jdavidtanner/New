@@ -1,14 +1,62 @@
-"""Bootstrap CIs, effect size, partial correlation, FDR correction."""
+"""Bootstrap CIs, effect size, partial correlation, and FDR correction."""
 
 from __future__ import annotations
 
+import math
+from collections.abc import Callable
+
 import numpy as np
-from scipy import stats
+
+
+def _normal_two_sided_p(z: float) -> float:
+    """Approximate a two-sided p-value from a standard-normal z score."""
+    return float(math.erfc(abs(z) / math.sqrt(2.0)))
+
+
+def pearsonr(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
+    """Dependency-free Pearson correlation with an approximate p-value."""
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    mask = np.isfinite(x) & np.isfinite(y)
+    x = x[mask]
+    y = y[mask]
+    n = len(x)
+    if n < 2 or x.std() < 1e-12 or y.std() < 1e-12:
+        return 0.0, 1.0
+    r = float(np.corrcoef(x, y)[0, 1])
+    r = max(-1.0, min(1.0, r))
+    if n < 4 or abs(r) >= 1.0:
+        p = 0.0 if abs(r) >= 1.0 else 1.0
+    else:
+        z = 0.5 * math.log((1.0 + r) / (1.0 - r)) * math.sqrt(n - 3)
+        p = _normal_two_sided_p(z)
+    return r, p
+
+
+def _rankdata(values: np.ndarray) -> np.ndarray:
+    """Return average ranks for a 1D array, handling ties."""
+    values = np.asarray(values, dtype=float)
+    order = np.argsort(values, kind="mergesort")
+    ranks = np.empty(len(values), dtype=float)
+    sorted_values = values[order]
+    i = 0
+    while i < len(values):
+        j = i + 1
+        while j < len(values) and sorted_values[j] == sorted_values[i]:
+            j += 1
+        ranks[order[i:j]] = (i + j - 1) / 2.0 + 1.0
+        i = j
+    return ranks
+
+
+def spearmanr(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
+    """Dependency-free Spearman correlation with an approximate p-value."""
+    return pearsonr(_rankdata(np.asarray(x, dtype=float)), _rankdata(np.asarray(y, dtype=float)))
 
 
 def bootstrap_ci(
     data: np.ndarray,
-    statistic=np.mean,
+    statistic: Callable[[np.ndarray], float] = np.mean,
     n_bootstrap: int = 1000,
     ci: float = 0.95,
     seed: int = 42,
@@ -39,21 +87,16 @@ def eta_squared(groups: list[np.ndarray]) -> float:
 
 
 def partial_correlation(x: np.ndarray, y: np.ndarray, controls: np.ndarray) -> tuple[float, float]:
-    """Partial correlation of x and y controlling for columns in controls.
+    """Partial correlation of x and y controlling for columns in controls."""
 
-    Returns (r, p_value).
-    """
     def residuals(target: np.ndarray) -> np.ndarray:
-        X = np.column_stack([np.ones(len(controls)), controls])
-        beta, _, _, _ = np.linalg.lstsq(X, target, rcond=None)
-        return target - X @ beta
+        design = np.column_stack([np.ones(len(controls)), controls])
+        beta, _, _, _ = np.linalg.lstsq(design, target, rcond=None)
+        return target - design @ beta
 
-    r_x = residuals(x)
-    r_y = residuals(y)
-    if r_x.std() < 1e-10 or r_y.std() < 1e-10:
-        return 0.0, 1.0
-    r, p = stats.pearsonr(r_x, r_y)
-    return float(r), float(p)
+    r_x = residuals(np.asarray(x, dtype=float))
+    r_y = residuals(np.asarray(y, dtype=float))
+    return pearsonr(r_x, r_y)
 
 
 def fdr_correct(p_values: np.ndarray, alpha: float = 0.05) -> tuple[np.ndarray, np.ndarray]:
@@ -62,11 +105,12 @@ def fdr_correct(p_values: np.ndarray, alpha: float = 0.05) -> tuple[np.ndarray, 
     Returns (reject, adjusted_p_values).
     """
     n = len(p_values)
+    if n == 0:
+        return np.array([], dtype=bool), np.array([], dtype=float)
     sorted_idx = np.argsort(p_values)
     sorted_p = p_values[sorted_idx]
     thresholds = alpha * np.arange(1, n + 1) / n
     reject_sorted = sorted_p <= thresholds
-    # Find last rejection
     last = np.where(reject_sorted)[0]
     if len(last) == 0:
         reject_sorted[:] = False

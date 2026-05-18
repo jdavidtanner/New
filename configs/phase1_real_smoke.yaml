@@ -1,0 +1,33 @@
+phase: 1
+name: "real_model_smoke_observational_mapping"
+
+model:
+  alias: "tiny-gpt2-smoke"
+
+device: "cpu"
+dtype: "float32"
+max_new_tokens: 8
+
+domains:
+  low_curvature:
+    - "real_smoke_arithmetic"
+  high_curvature:
+    - "real_smoke_speculative"
+
+prompts_per_domain: 3
+perturbations_per_prompt: 2
+
+perturbations:
+  text:
+    - sentence_reorder
+    - distractor_insertion
+
+curvature_proxies:
+  - trajectory_divergence
+  - intrinsic_dimension
+  - neighborhood_distortion
+
+semantic_metrics:
+  - nli_entailment
+  - nli_contradiction
+  - evidence_utilization

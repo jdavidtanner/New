@@ -1,0 +1,13 @@
+phase: 2
+name: "poc_cross_architecture_replication"
+
+model_sweep:
+  - "mock-tiny"
+
+phase1_config: "configs/phase1_poc.yaml"
+
+comparison:
+  effect_size_metric: "cohens_d"
+  significance_level: 0.05
+  fdr_correction: true
+  min_replications_for_support: 1

@@ -1,0 +1,37 @@
+phase: 6
+name: "poc_atlas_utility_test"
+
+model:
+  alias: "mock-tiny"
+
+device: "cpu"
+max_new_tokens: 8
+num_generations: 2
+
+curvature_proxies:
+  - trajectory_divergence
+  - intrinsic_dimension
+
+routing:
+  policy: "threshold"
+  thresholds:
+    low_curvature: 0.3
+    medium_curvature: 0.6
+    high_curvature: 0.85
+  curvature_proxy: "trajectory_divergence"
+  completeness_signal: "nli_entailment"
+
+retrieval:
+  top_k: 2
+
+baselines:
+  vanilla: true
+  rag_only: true
+  calibrated: true
+  self_consistency: true
+
+evaluation:
+  domain: "poc_eval"
+  dataset: "synthetic"
+  split: "validation"
+  n_examples: 2

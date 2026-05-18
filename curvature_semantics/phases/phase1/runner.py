@@ -2,30 +2,53 @@
 
 from __future__ import annotations
 
-import time
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import torch
 
-from curvature_semantics.core.config_manager import ConfigManager, ExperimentConfig
 from curvature_semantics.core.artifact_store import ArtifactStore
+from curvature_semantics.core.config_manager import ExperimentConfig
 from curvature_semantics.core.dataset_loader import load_domain_examples
-from curvature_semantics.core.logging_utils import get_logger, log_config
-from curvature_semantics.core.model_loader import load_model_and_tokenizer, get_num_layers
 from curvature_semantics.core.hidden_state_extractor import HiddenStateExtractor
-from curvature_semantics.perturbations.perturbation_suite import PerturbationSuite
+from curvature_semantics.core.logging_utils import get_logger, log_config
+from curvature_semantics.core.model_loader import load_model_and_tokenizer
 from curvature_semantics.curvature.curvature_aggregator import CurvatureAggregator
-from curvature_semantics.semantics.completeness_aggregator import CompletenessAggregator
-from curvature_semantics.regression.feature_builder import build_feature_df
+from curvature_semantics.curvature.trajectory_divergence import LocalTrajectoryDivergence
+from curvature_semantics.perturbations.perturbation_suite import PerturbationSuite
 from curvature_semantics.phases.phase1.correlation_analysis import (
-    compute_correlation_matrix, compute_partial_correlations, summarise_findings,
+    compute_correlation_matrix,
+    compute_partial_correlations,
+    summarise_findings,
 )
-from curvature_semantics.visualization.phase_space import plot_phase_space
+from curvature_semantics.semantics.completeness_aggregator import CompletenessAggregator
 from curvature_semantics.visualization.layerwise_geometry import plot_layerwise_curvature
+from curvature_semantics.visualization.phase_space import plot_phase_space
 
 logger = get_logger(__name__)
+
+
+def _generate(model: Any, tokenizer: Any, inputs: dict[str, Any], device: torch.device, cfg: ExperimentConfig) -> str:
+    with torch.no_grad():
+        gen_ids = model.generate(
+            inputs["input_ids"].to(device),
+            max_new_tokens=cfg.max_new_tokens,
+            temperature=cfg.temperature if cfg.temperature > 0 else None,
+            do_sample=cfg.temperature > 0,
+            pad_token_id=tokenizer.eos_token_id,
+        )
+    return tokenizer.decode(gen_ids[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+
+
+def _extract_last_token(
+    extractor: HiddenStateExtractor,
+    tokenizer: Any,
+    prompt: str,
+) -> tuple[dict[str, Any], np.ndarray]:
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding=True)
+    bundle = extractor.extract(inputs["input_ids"], inputs.get("attention_mask"))
+    return inputs, bundle.last_token_array()[:, 0, :]
 
 
 def run(cfg: ExperimentConfig) -> dict[str, Any]:
@@ -41,17 +64,15 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
         load_in_8bit=model_spec.load_in_8bit,
         load_in_4bit=model_spec.load_in_4bit,
     )
-    n_layers = get_num_layers(model)
+    device = next(model.parameters()).device
     extractor = HiddenStateExtractor(model, extract_logits=True)
     perturb_suite = PerturbationSuite.from_config(cfg)
     curv_agg = CurvatureAggregator.from_config(cfg)
     sem_agg = CompletenessAggregator.from_config(cfg)
+    traj = LocalTrajectoryDivergence()
 
     domains_cfg = cfg.raw.get("domains", {})
-    all_domains = []
-    for tier_domains in domains_cfg.values():
-        all_domains.extend(tier_domains)
-
+    all_domains = [d for tier_domains in domains_cfg.values() for d in tier_domains]
     n_prompts = cfg.raw.get("prompts_per_domain", 10)
     n_pert = cfg.raw.get("perturbations_per_prompt", 3)
 
@@ -66,99 +87,81 @@ def run(cfg: ExperimentConfig) -> dict[str, Any]:
             context = ex.get("context", "")
             reference = ex.get("answer", "")
 
-            # Tokenize
-            inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding=True)
+            variants: list[dict[str, Any]] = [
+                {"prompt": prompt, "perturbation": "none", "context": context, "reference": reference}
+            ]
+            for sample in perturb_suite.perturb_text(prompt, n=n_pert):
+                variants.append({
+                    "prompt": sample.perturbed_text,
+                    "perturbation": sample.perturbation_name,
+                    "context": context,
+                    "reference": reference,
+                })
 
-            # Extract hidden states
-            bundle = extractor.extract(inputs["input_ids"], inputs.get("attention_mask"))
-            hs_array = bundle.last_token_array()  # (n_layers, 1, hidden_dim)
-            hs_array = hs_array[:, 0, :]  # (n_layers, hidden_dim)
+            variant_states: list[np.ndarray] = []
+            variant_meta: list[dict[str, Any]] = []
+            original_states: np.ndarray | None = None
 
-            # Generate response
-            with torch.no_grad():
-                gen_ids = model.generate(
-                    inputs["input_ids"].to(cfg.device),
-                    max_new_tokens=cfg.max_new_tokens,
-                    temperature=cfg.temperature if cfg.temperature > 0 else None,
-                    do_sample=cfg.temperature > 0,
-                    pad_token_id=tokenizer.eos_token_id,
+            for variant in variants:
+                inputs, states = _extract_last_token(extractor, tokenizer, variant["prompt"])
+                response = _generate(model, tokenizer, inputs, device, cfg)
+                sem_bundle = sem_agg.score(
+                    variant["prompt"],
+                    response,
+                    context=variant["context"],
+                    reference=variant["reference"],
+                    domain=domain,
                 )
-            response = tokenizer.decode(gen_ids[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
-
-            # Semantic completeness on original
-            sem_bundle = sem_agg.score(prompt, response, context=context, reference=reference, domain=domain)
-
-            # Curvature per layer for original
-            for layer_idx in range(hs_array.shape[0]):
-                hs_layer = hs_array[layer_idx:layer_idx + 1]  # (1, hidden_dim)
-                curv_bundle = curv_agg.compute_layer(hs_layer, layer_idx=layer_idx)
-                row = {
+                if variant["perturbation"] == "none":
+                    original_states = states
+                variant_states.append(states)
+                variant_meta.append({
                     "domain": domain,
-                    "prompt": prompt[:100],
+                    "prompt": variant["prompt"][:100],
                     "response": response[:100],
-                    "layer_idx": layer_idx,
-                    **curv_bundle.metrics,
-                    **sem_bundle.metrics,
                     "model_alias": model_spec.alias,
                     "model_params_billions": model_spec.params_billions,
-                    "perturbation": "none",
-                }
-                all_rows.append(row)
+                    "perturbation": variant["perturbation"],
+                    **sem_bundle.metrics,
+                })
 
-            # Perturbations
-            pert_samples = perturb_suite.perturb_text(prompt, n=n_pert)
-            for ps in pert_samples:
-                p_inputs = tokenizer(ps.perturbed_text, return_tensors="pt", truncation=True, max_length=512, padding=True)
-                p_bundle = extractor.extract(p_inputs["input_ids"], p_inputs.get("attention_mask"))
-                p_hs = p_bundle.last_token_array()[:, 0, :]
-
-                with torch.no_grad():
-                    p_gen_ids = model.generate(
-                        p_inputs["input_ids"].to(cfg.device),
-                        max_new_tokens=cfg.max_new_tokens,
-                        temperature=cfg.temperature if cfg.temperature > 0 else None,
-                        do_sample=cfg.temperature > 0,
-                        pad_token_id=tokenizer.eos_token_id,
+            if not variant_states:
+                continue
+            stacked = np.stack(variant_states, axis=1)  # (n_layers, n_variants, hidden_dim)
+            for variant_idx, meta in enumerate(variant_meta):
+                pair_metrics: dict[str, float] = {}
+                if original_states is not None and meta["perturbation"] != "none":
+                    pair_metrics = traj.compute_from_trajectory_pair(
+                        original_states,
+                        variant_states[variant_idx],
                     )
-                p_response = tokenizer.decode(p_gen_ids[0][p_inputs["input_ids"].shape[1]:], skip_special_tokens=True)
-                p_sem = sem_agg.score(ps.perturbed_text, p_response, context=context, reference=reference, domain=domain)
-
-                # Trajectory divergence between original and perturbed
-                from curvature_semantics.curvature.trajectory_divergence import LocalTrajectoryDivergence
-                traj = LocalTrajectoryDivergence()
-                traj_metrics = traj.compute_from_trajectory_pair(hs_array, p_hs)
-
-                for layer_idx in range(p_hs.shape[0]):
-                    p_curv = curv_agg.compute_layer(p_hs[layer_idx:layer_idx + 1], layer_idx=layer_idx)
-                    row = {
-                        "domain": domain,
-                        "prompt": ps.perturbed_text[:100],
-                        "response": p_response[:100],
+                for layer_idx in range(stacked.shape[0]):
+                    curv_bundle = curv_agg.compute_layer(stacked[layer_idx], layer_idx=layer_idx)
+                    all_rows.append({
+                        **meta,
                         "layer_idx": layer_idx,
-                        **p_curv.metrics,
-                        **p_sem.metrics,
-                        **traj_metrics,
-                        "model_alias": model_spec.alias,
-                        "model_params_billions": model_spec.params_billions,
-                        "perturbation": ps.perturbation_name,
-                    }
-                    all_rows.append(row)
+                        **curv_bundle.metrics,
+                        **pair_metrics,
+                    })
 
     df = pd.DataFrame(all_rows)
     store.save_df("features", df)
 
-    # Correlation analysis
-    corr_df = compute_correlation_matrix(df)
-    partial_df = compute_partial_correlations(df)
-    findings = summarise_findings(corr_df, partial_df)
+    corr_df = compute_correlation_matrix(df) if not df.empty else pd.DataFrame()
+    partial_df = compute_partial_correlations(df) if not df.empty else pd.DataFrame()
+    findings = summarise_findings(corr_df, partial_df) if not corr_df.empty else {}
     store.save_json("correlation_matrix", corr_df.to_dict())
     store.save_json("partial_correlations", partial_df.to_dict())
     store.save_json("findings", findings)
 
-    # Visualisations
-    figures_dir = store.path("figures")
-    plot_phase_space(df, output_path=figures_dir / "phase_space")
-    plot_layerwise_curvature(df, curvature_cols=["trajectory_divergence", "intrinsic_dimension"], output_path=figures_dir / "layerwise")
+    if not df.empty:
+        figures_dir = store.path("figures")
+        plot_phase_space(df, output_path=figures_dir / "phase_space")
+        plot_layerwise_curvature(
+            df,
+            curvature_cols=["trajectory_divergence", "intrinsic_dimension"],
+            output_path=figures_dir / "layerwise",
+        )
 
     logger.info("Phase 1 complete. %d rows collected.", len(all_rows))
     return {"n_rows": len(all_rows), "findings": findings, "output_dir": str(store.phase_dir)}
