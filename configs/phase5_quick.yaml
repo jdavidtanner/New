@@ -1,0 +1,42 @@
+phase: 5
+name: "synthetic_ontology_test"
+
+ontology:
+  num_entities: 30
+  num_relations: 6
+  num_rules: 10
+  num_bridge_concepts: 6
+  num_contradictions: 3
+  graph_density: 0.20
+  seed: 42
+
+corpus:
+  train_size: 800
+  val_size: 100
+
+toy_model:
+  architecture: "gpt2"
+  hidden_size: 64
+  num_layers: 2
+  num_heads: 2
+  max_position_embeddings: 128
+  vocab_size: 500
+
+training:
+  num_epochs: 5
+  batch_size: 16
+  learning_rate: 3.0e-4
+  warmup_steps: 20
+  checkpoint_every: 5
+
+probing:
+  n_prompts_per_bridge: 5
+  curvature_proxies:
+    - trajectory_divergence
+    - intrinsic_dimension
+  semantic_metrics:
+    - nli_entailment
+    - self_consistency
+
+causal_test:
+  n_add_remove_cycles: 2
