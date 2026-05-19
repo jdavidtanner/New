@@ -1,0 +1,41 @@
+phase: 4
+name: "intervention_truthfulqa"
+
+model:
+  alias: "qwen-7b-instruct"
+  load_in_8bit: false
+  load_in_4bit: true
+
+device: "cuda"
+dtype: "float16"
+max_new_tokens: 64
+seed: 42
+
+# TruthfulQA's correct_answers / incorrect_answers fields make this domain ideal:
+#   evidence_insertion  → prepend correct_answers as supporting context
+#   contradiction_removal → detect and strip incorrect_answers from context
+#   curvature_aware_retrieval → retrieve from a pool of correct answers
+domains:
+  - "truthful_qa"
+
+prompts_per_domain: 200
+
+interventions:
+  evidence_insertion:
+    enabled: true
+    num_sentences: 2
+    source: "gold_context"
+  bridge_concept:
+    enabled: true
+    max_concepts: 5
+    source: "ontology"
+  contradiction_removal:
+    enabled: true
+    nli_threshold: 0.65        # slightly lower than default; TruthfulQA contradictions are subtle
+  finetuning:
+    enabled: false
+  curvature_aware_retrieval:
+    enabled: true
+    top_k: 3
+    curvature_weight: 0.4
+    retrieval_model: "sentence-transformers/all-MiniLM-L6-v2"

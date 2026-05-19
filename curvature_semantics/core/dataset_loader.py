@@ -23,6 +23,8 @@ DOMAIN_DATASET_MAP: dict[str, tuple[str, str | None, str]] = {
     "speculative_medicine": ("allenai/qasper", None, "validation"),
     "synthetic_biography": ("trivia_qa", "rc", "validation"),
     "fictional_canon_blending": ("trivia_qa", "rc", "validation"),
+    # Real benchmark — 817 validated questions designed to elicit hallucinations
+    "truthful_qa": ("truthful_qa", "generation", "validation"),
 }
 
 
@@ -61,6 +63,22 @@ def load_domain_examples(
 
 def _normalize_row(domain: str, row: dict[str, Any]) -> dict[str, Any]:
     """Convert various dataset schemas to a unified dict."""
+    # TruthfulQA generation split: question / best_answer / correct_answers / incorrect_answers
+    if "best_answer" in row:
+        correct = list(row.get("correct_answers") or [])
+        incorrect = list(row.get("incorrect_answers") or [])
+        # Supporting evidence from correct answers + one incorrect statement for
+        # contradiction_removal to detect (mirrors real retrieval noise)
+        ctx_parts = correct[:2]
+        if incorrect:
+            ctx_parts.append(incorrect[0])
+        return {
+            "domain": domain,
+            "prompt": str(row["question"]),
+            "answer": str(row["best_answer"]),
+            "context": " ".join(ctx_parts),
+        }
+
     # Openbookqa / multiple-choice: build a readable prompt from question_stem + choices
     if "question_stem" in row:
         choices = row.get("choices", {})

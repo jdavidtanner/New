@@ -1,0 +1,43 @@
+phase: 6
+name: "atlas_truthfulqa"
+
+model:
+  alias: "qwen-7b-instruct"
+  load_in_8bit: false
+  load_in_4bit: true
+
+device: "cuda"
+dtype: "float16"
+max_new_tokens: 64
+num_generations: 3             # self-consistency samples
+seed: 42
+
+routing:
+  policy: "threshold"
+  calibrate_thresholds: true   # fit low/medium from entropy percentiles
+  thresholds:
+    low_curvature: 0.3         # overridden by calibration
+    medium_curvature: 0.6
+    high_curvature: 0.90       # TruthfulQA questions are genuinely hard; lower abstain bar
+  curvature_proxy: "trajectory_divergence"
+  completeness_signal: "nli_entailment"
+
+retrieval:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  top_k: 5
+  index_type: "flat"
+
+baselines:
+  vanilla: true
+  rag_only: true
+  calibrated: true
+  self_consistency: true
+
+evaluation:
+  domain: "truthful_qa"
+  n_examples: 200
+  metrics:
+    - accuracy
+    - coverage
+    - nli_entailment
+    - nli_contradiction

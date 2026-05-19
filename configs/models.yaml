@@ -85,6 +85,20 @@ models:
     params_billions: 1.5
     alias: "qwen-1.5b-instruct"
 
+  - id: "Qwen/Qwen2.5-7B-Instruct"
+    family: "qwen"
+    type: "dense"
+    tuning: "instruct"
+    params_billions: 7.0
+    alias: "qwen-7b-instruct"
+
+  - id: "Qwen/Qwen2.5-14B-Instruct"
+    family: "qwen"
+    type: "dense"
+    tuning: "instruct"
+    params_billions: 14.0
+    alias: "qwen-14b-instruct"
+
   # Mixture-of-experts
   - id: "mistralai/Mixtral-8x7B-v0.1"
     family: "mixtral"

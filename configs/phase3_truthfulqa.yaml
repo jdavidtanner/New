@@ -1,0 +1,47 @@
+phase: 3
+name: "causal_patching_truthfulqa"
+
+model:
+  alias: "qwen-7b-instruct"
+  load_in_8bit: false
+  load_in_4bit: true          # fits on a 16GB GPU; set false on A100 40GB for float16
+
+device: "cuda"
+dtype: "float16"
+max_new_tokens: 64
+temperature: 0.0
+seed: 42
+
+# TruthfulQA validation split: 817 examples, all one domain
+# Set prompts_per_domain to 817 for a full run, 200 for a fast run
+domains:
+  high_curvature:
+    - "truthful_qa"
+
+prompts_per_domain: 500
+
+# Qwen2.5-7B-Instruct has 28 transformer layers
+# early=7, mid=14, late=21
+target_layers: [7, 14, 21]
+
+noise_alphas: [0.0, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0]
+
+curvature_proxies:
+  - trajectory_divergence
+  - intrinsic_dimension
+  - neighborhood_distortion
+
+curvature_params:
+  trajectory_divergence:
+    n_neighbors: 5
+  intrinsic_dimension:
+    method: "twonn"
+  neighborhood_distortion:
+    k: 5
+
+semantic_metrics:
+  - nli_entailment
+  - nli_contradiction
+  - self_consistency
+
+nli_model: "cross-encoder/nli-deberta-v3-base"
