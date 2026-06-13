@@ -39,6 +39,11 @@ tda = [
     "gudhi>=3.9.0",
     "persim>=0.3.1",
 ]
+reelscope = [
+    "yt-dlp>=2024.1.0",
+    "instaloader>=4.10",
+    "anthropic>=0.40.0",
+]
 regression = [
     "statsmodels>=0.14.1",
     "dowhy>=0.11.1",
@@ -77,10 +82,11 @@ curvature-phase5 = "curvature_semantics.phases.phase5.cli:main"
 curvature-phase6 = "curvature_semantics.phases.phase6.cli:main"
 curvature-regress = "curvature_semantics.regression.regression_report:main"
 curvature-viz = "curvature_semantics.visualization.curvature_atlas:main"
+reelscope = "reelscope.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["curvature_semantics*"]
+include = ["curvature_semantics*", "reelscope*"]
 
 [tool.black]
 line-length = 100
