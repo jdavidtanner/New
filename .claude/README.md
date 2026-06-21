@@ -42,6 +42,15 @@ server shows **Connected**.
 Invoke explicitly with `/frontend-design` or `/web-design-guidelines`, or just
 ask Claude to build or review UI and the relevant skill engages.
 
+### Design quality (motion, polish, taste)
+
+| Skill | Source | Purpose | External deps |
+| --- | --- | --- | --- |
+| `emil-design-eng` | `emilkowalski/skills` | Emil Kowalski's craft sensibility — purposeful motion, easing curves, and the invisible details that make UI feel smooth and alive (incl. knowing when *not* to animate). | None |
+| `review-animations` | `emilkowalski/skills` | Audit existing animations against the same motion principles. | None |
+| `impeccable` | `pbakaus/impeccable` | Shared design vocabulary that fixes spacing, typography, layout, alignment, color, and motion. Ships 44 deterministic anti-pattern detectors and a live-browser iteration loop. | The committed skill is self-contained. For the full 23-command suite + agent + hooks across tools, run `npx impeccable install` then `/impeccable init`. |
+| `design-taste-frontend` | `Leonxlnx/taste-skill` | The "Taste" skill — anti-slop landing pages/portfolios/redesigns. Reads the brief, infers a design direction, and ships interfaces that don't look templated. | None. The source repo also has 12 optional variants (minimalist, brutalist, soft, redesign, brandkit, image-to-code, imagegen, etc.) — not installed to avoid clutter. |
+
 ### Workflow & productivity (part one)
 
 | Skill | Source | Purpose | External deps |
