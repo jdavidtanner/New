@@ -1,8 +1,9 @@
-# Website-designer tooling
+# Claude Code tooling
 
-This directory and the project's `.mcp.json` install a website-design toolkit
-for Claude Code. Everything is **project-scoped** (committed to the repo) so it
-persists across web sessions and ephemeral containers.
+This directory and the project's `.mcp.json` install a Claude Code toolkit
+(website-design servers plus a set of workflow skills). Everything here is
+**project-scoped** (committed to the repo) so it persists across web sessions
+and ephemeral containers.
 
 ## MCP servers (`.mcp.json`)
 
@@ -31,10 +32,42 @@ server shows **Connected**.
 
 ## Skills (`.claude/skills/`)
 
+### Website design
+
 | Skill | Source | Purpose |
 | --- | --- | --- |
 | `frontend-design` | Anthropic (`anthropics/claude-code`) | Design-lead guidance — distinctive typography, palettes, and motion so output doesn't read as a templated "AI website". Activates automatically when building UI. |
 | `web-design-guidelines` | Vercel (`vercel-labs/agent-skills`) | Audits finished UI against Vercel's Web Interface Guidelines (accessibility, keyboard support, forms, animation, performance) and reports `file:line` fixes. |
 
-Invoke a skill explicitly with `/frontend-design` or `/web-design-guidelines`,
-or just ask Claude to build or review UI and the relevant skill engages.
+Invoke explicitly with `/frontend-design` or `/web-design-guidelines`, or just
+ask Claude to build or review UI and the relevant skill engages.
+
+### Workflow & productivity (part one)
+
+| Skill | Source | Purpose | External deps |
+| --- | --- | --- | --- |
+| `skill-creator` | Anthropic (`anthropics/skills`) | Create, edit, and optimize skills; run evals and benchmark skill performance. | None |
+| `autoresearch` | `uditgoenka/autoresearch` (Karpathy-inspired) | Autonomous improvement loop: set a goal + a mechanical metric, then modify → verify → keep/discard until it converges. | None for the skill. Full 14-command + 9-hook suite needs the plugin (below). |
+| `obsidian-markdown`, `obsidian-bases`, `json-canvas`, `obsidian-cli`, `defuddle` | `kepano/obsidian-skills` (Obsidian's CEO) | Teach Claude to work with Obsidian vaults: Obsidian-flavored Markdown, `.base` databases, JSON Canvas, vault automation via the Obsidian CLI, and clean web→markdown extraction. | `obsidian-cli` needs the [Obsidian CLI](https://help.obsidian.md/cli); `defuddle` needs the Defuddle CLI. The format skills (markdown/bases/canvas) work standalone. |
+| `notebooklm` | `teng-lin/notebooklm-py` (unofficial) | Drive Google NotebookLM from Claude Code — create notebooks, add sources, query, generate podcasts/artifacts. | Needs `pip install "notebooklm-py[browser]"`, `playwright install chromium`, then `notebooklm login`. Uses **undocumented** Google APIs — may break without notice. |
+
+## Not committed — interactive / credentialed installs
+
+These were requested but can't live in the repo as files; run them in your own
+Claude Code session:
+
+- **Codex plugin** (`openai/codex-plugin-cc`) — adversarial second-opinion
+  reviews from OpenAI Codex. Requires Node 18.18+ and a ChatGPT/OpenAI account.
+  Install:
+  ```
+  /plugin marketplace add openai/codex-plugin-cc
+  /plugin install codex@openai-codex
+  /codex:setup
+  ```
+  Then use `/codex:review` or `/codex:adversarial-review`.
+- **AutoResearch full plugin** — the committed `autoresearch` skill gives the
+  core loop, but the complete 14-command set and 9 safety hooks install as a
+  plugin: `/plugin marketplace add uditgoenka/autoresearch`.
+- **NotebookLM auth** — after `pip install "notebooklm-py[browser]"` and
+  `playwright install chromium`, run `notebooklm login` once to authenticate the
+  browser session the `notebooklm` skill drives.
