@@ -8,6 +8,7 @@ persists across web sessions and ephemeral containers.
 
 | Server | Package | Purpose |
 | --- | --- | --- |
+| `github` | remote HTTP (`api.githubcopilot.com/mcp/`) | GitHub's official MCP server — manage repos/issues/PRs, monitor Actions runs, analyze build failures, manage releases, and review security findings. Needs `GITHUB_PAT`. |
 | `shadcn` | `shadcn@latest mcp` | Pull production-ready, customizable UI components (buttons, menus, pricing sections, login forms) from the shadcn registry. |
 | `chrome-devtools` | `chrome-devtools-mcp@latest` | Let Claude open the site in a real Chrome browser, inspect the DOM/console/network, and self-correct what it builds. |
 | `magic` | `@21st-dev/magic@latest` | 21st.dev component generator — hero animations, button animations, and cohesive full-site styles. |
@@ -22,6 +23,11 @@ server shows **Connected**.
   `${MAGIC_API_KEY}`.
 - **shadcn** and **chrome-devtools** run via `npx` with no key. Chrome DevTools
   MCP requires a Chrome/Chromium install available to the runtime.
+- **GitHub** uses the remote (HTTP) mode with a Personal Access Token. Create a
+  PAT at https://github.com/settings/personal-access-tokens and export it as
+  `GITHUB_PAT`; the `.mcp.json` sends it as `Authorization: Bearer ${GITHUB_PAT}`.
+  If your MCP host can't reach remote servers, swap in GitHub's local Docker
+  image (`ghcr.io/github/github-mcp-server`) instead.
 
 ## Skills (`.claude/skills/`)
 
